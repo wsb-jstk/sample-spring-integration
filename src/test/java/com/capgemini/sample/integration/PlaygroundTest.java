@@ -26,6 +26,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.time.Duration;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -53,10 +54,12 @@ class PlaygroundTest {
                                                      .handleNext(m -> {});
         this.exitChannel.subscribe(mh);
         // prepare message
-        final Message<Integer> msg = TestUtil.createMessage(1);
+        final Message<Integer> msg1 = TestUtil.createMessage(1);
+        final Message<String> msg2 = TestUtil.createMessage("druga wiadomosc");
         // when
         try {
-            this.entryChannel.send(msg);
+            this.entryChannel.send(msg1);
+            this.entryChannel.send(msg2);
             // then
             Awaitility.await()
                       .atMost(Duration.ofSeconds(10))
@@ -80,6 +83,7 @@ class PlaygroundTest {
         @Bean(ENTRY_CHANNEL)
         MessageChannel entryChannel() {
             return MessageChannels.direct()
+                                  .datatype(Integer.class, String.class)
                                   .get();
         }
 
@@ -93,6 +97,14 @@ class PlaygroundTest {
         public IntegrationFlow flow() {
             return IntegrationFlows.from(entryChannel())
                                    .log(LoggingHandler.Level.WARN, m -> "Received: " + m.getPayload())
+                                   .enrichHeaders(spec -> spec.header("componentCreatedAt", Instant.now()))
+                                   .enrichHeaders(spec -> spec.headerFunction("now", m -> Instant.now()))
+                                   .enrichHeaders(spec -> spec.headerFunction("is_number", m -> TestUtil.isNumber(m.getPayload())))
+                                   .filter(p -> p != null, spec -> spec.id("notNullFilter"))
+                                   .filter(p -> p.toString().length() >=1 )
+                                   //.filter(String.class, p -> p.length() >= 1 ) // moglbym tak zrobic gdybym spodziewal sie tylko Stringow ALE w naszym przykladzie trafiaja tutaj msg z Integer i String
+                                   .filter(Message.class, m -> m.getHeaders().containsKey("is_number")) // sposob na dostanie sie do headera
+                                   .log(LoggingHandler.Level.WARN)
                                    .channel(exitChannel())
                                    .get();
         }

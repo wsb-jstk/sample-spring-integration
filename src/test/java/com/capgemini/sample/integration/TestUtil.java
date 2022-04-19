@@ -13,4 +13,16 @@ public class TestUtil {
                              .build();
     }
 
+    public static boolean isNumber(Object object) {
+        return object.toString()
+                     .chars()
+                     .allMatch(Character::isDigit);
+        // try {
+        //     Integer.parseInt(object.toString());
+        //     return true;
+        // } catch (NumberFormatException e) {
+        //     return false;
+        // }
+    }
+
 }
