@@ -4,6 +4,7 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.exceptions.base.MockitoException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -14,10 +15,13 @@ import org.springframework.integration.config.EnableIntegration;
 import org.springframework.integration.dsl.IntegrationFlow;
 import org.springframework.integration.dsl.IntegrationFlows;
 import org.springframework.integration.dsl.MessageChannels;
+import org.springframework.integration.handler.GenericHandler;
+import org.springframework.integration.handler.LoggingHandler;
 import org.springframework.integration.test.mock.MockIntegration;
 import org.springframework.integration.test.mock.MockMessageHandler;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.MessageHandler;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 
@@ -25,6 +29,10 @@ import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * @see MessageHandler
+ * @see GenericHandler
+ */
 @ExtendWith(SpringExtension.class)
 @ContextConfiguration(classes = PlaygroundTest.TestConfig.class)
 class PlaygroundTest {
@@ -44,6 +52,7 @@ class PlaygroundTest {
         final MockMessageHandler mh = MockIntegration.mockMessageHandler(messageArgumentCaptor)
                                                      .handleNext(m -> {});
         this.exitChannel.subscribe(mh);
+        // prepare message
         final Message<Integer> msg = TestUtil.createMessage(1);
         // when
         try {
@@ -51,6 +60,7 @@ class PlaygroundTest {
             // then
             Awaitility.await()
                       .atMost(Duration.ofSeconds(10))
+                      .ignoreException(MockitoException.class)
                       .untilAsserted(() -> {
                           final Message<?> value = messageArgumentCaptor.getValue();
                           assertThat(value).isNotNull();
@@ -82,7 +92,7 @@ class PlaygroundTest {
         @Bean
         public IntegrationFlow flow() {
             return IntegrationFlows.from(entryChannel())
-                                   .log()
+                                   .log(LoggingHandler.Level.WARN, m -> "Received: " + m.getPayload())
                                    .channel(exitChannel())
                                    .get();
         }
