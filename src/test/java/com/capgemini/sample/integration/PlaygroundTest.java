@@ -1,5 +1,6 @@
 package com.capgemini.sample.integration;
 
+import com.capgemini.sample.integration.domain.Employee;
 import com.capgemini.sample.integration.si.MultiplicationHandler;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
@@ -57,10 +58,12 @@ class PlaygroundTest {
         // prepare message
         final Message<Integer> msg1 = TestUtil.createMessage(2);
         final Message<Integer> msg2 = TestUtil.createMessage(200);
+        final Message<String> msg3 = TestUtil.createMessage("trzecia wiadomosc");
         // when
         try {
             this.entryChannel.send(msg1);
             this.entryChannel.send(msg2);
+            this.entryChannel.send(msg3);
             // then
             Awaitility.await()
                       .atMost(Duration.ofSeconds(10))
@@ -80,6 +83,7 @@ class PlaygroundTest {
 
         public static final String ENTRY_CHANNEL = "entryChannel";
         public static final String EXIT_CHANNEL = "exitChannel";
+        public static final String DISCARD_FILTER_CHANNEL = "discardFilterChannel";
 
         @Bean(ENTRY_CHANNEL)
         MessageChannel entryChannel() {
@@ -94,6 +98,12 @@ class PlaygroundTest {
                                   .get();
         }
 
+        @Bean(DISCARD_FILTER_CHANNEL)
+        MessageChannel discardFilterChannel() {
+            return MessageChannels.publishSubscribe()
+                                  .get();
+        }
+
         @Bean
         public IntegrationFlow flow() {
             return IntegrationFlows.from(entryChannel())
@@ -104,9 +114,10 @@ class PlaygroundTest {
                                    .filter(p -> p != null, spec -> spec.id("notNullFilter"))
                                    .filter(p -> p.toString().length() >=1 )
                                    //.filter(String.class, p -> p.length() >= 1 ) // moglbym tak zrobic gdybym spodziewal sie tylko Stringow ALE w naszym przykladzie trafiaja tutaj msg z Integer i String
-                                   .filter(Message.class, m -> m.getHeaders().containsKey("is_number")) // sposob na dostanie sie do headera
+                                   .filter(Message.class, m -> m.getHeaders().containsKey("is_number") && (boolean)m.getHeaders().get("is_number"), spec -> spec.discardChannel(DISCARD_FILTER_CHANNEL)) // sposob na dostanie sie do headera
                                    .handle(Integer.class, (p, h) -> p * 2)
                                    .handle(new MultiplicationHandler(2, 200))
+                                   .<Integer, Employee>transform(p -> new Employee(p))
                                    .log(LoggingHandler.Level.WARN)
                                    .channel(exitChannel())
                                    .get();
