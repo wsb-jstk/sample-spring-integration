@@ -1,5 +1,6 @@
 package com.capgemini.sample.integration;
 
+import com.capgemini.sample.integration.si.MultiplicationHandler;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,8 +55,8 @@ class PlaygroundTest {
                                                      .handleNext(m -> {});
         this.exitChannel.subscribe(mh);
         // prepare message
-        final Message<Integer> msg1 = TestUtil.createMessage(1);
-        final Message<String> msg2 = TestUtil.createMessage("druga wiadomosc");
+        final Message<Integer> msg1 = TestUtil.createMessage(2);
+        final Message<Integer> msg2 = TestUtil.createMessage(200);
         // when
         try {
             this.entryChannel.send(msg1);
@@ -104,6 +105,8 @@ class PlaygroundTest {
                                    .filter(p -> p.toString().length() >=1 )
                                    //.filter(String.class, p -> p.length() >= 1 ) // moglbym tak zrobic gdybym spodziewal sie tylko Stringow ALE w naszym przykladzie trafiaja tutaj msg z Integer i String
                                    .filter(Message.class, m -> m.getHeaders().containsKey("is_number")) // sposob na dostanie sie do headera
+                                   .handle(Integer.class, (p, h) -> p * 2)
+                                   .handle(new MultiplicationHandler(2, 200))
                                    .log(LoggingHandler.Level.WARN)
                                    .channel(exitChannel())
                                    .get();
